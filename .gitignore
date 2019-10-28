@@ -1,0 +1,13 @@
+## Python
+*.pyc
+__pycache__/
+
+## Mac
+.DS_Store
+
+## Google Drive
+Icon?
+
+## random experimental models
+_/void/
+_/void/*
