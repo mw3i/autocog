@@ -1,5 +1,5 @@
 '''
-Roughly implementation of a Long-Short-Term-Memory Recurrent Network
+Rough implementation of a Long-Short-Term-Memory Recurrent Network
 ~ barrowing heavily from the version made by HIPS (autograd team)
 
 '''

@@ -1,0 +1,17 @@
+Model Idea: Receptive Field Driven Model of Pattern Transfer
+
+
+
+Start with a receptive field layer on a given problem; then, 1-to-1 connections between receptive nodes and second layer of hidden nodes (ie, each hidden node gets it's own trainable receptive field)
+
+Then, on new problems, retrain the receptive nodes but dont retrain the hidden nodes <-- see if they can detect the same patterns in new regions of space
+
+
+
+
+
+
+
+
+
+
