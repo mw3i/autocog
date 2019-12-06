@@ -40,14 +40,11 @@ _Cognitive psychology models built with [numpy](http://www.numpy.org/) & [autogr
 - keep the modules very light weight and consistent
     - forward, loss, loss_grad functions in every model (that allow them)
     - only use numpy & autograd, and sometimes scipy
-    - parallelization would be cool but id rather wait for the autograd team to deal with that
 - want to include other cognitive models besides neural nets
+    - recurrent net
     - covis
     - bayesian things
-    - all the mclellend & team's models
-    - convolutional & recurrent nets
     - neural turing machines & differentiable computers
-        - ^ cuz i think they deserve being tested as model's of human cognition
 
 
 
