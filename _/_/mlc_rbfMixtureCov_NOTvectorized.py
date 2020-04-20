@@ -9,16 +9,15 @@ from autograd import grad
 
 softmax = lambda x: np.exp(x) / np.sum(np.exp(x))
 
-
 def forward(params, inputs = None, hps = None):
-
-    hidden_activation = np.exp(
-        -np.einsum(
-            'hif,fh->ih',
-            ((inputs - params['input']['hidden']['bias']) @ params['input']['cov']['weights'] ) ** 2,
-            params['input']['hidden']['weights']
-        )
-    )
+    hidden_activation = np.array([
+        np.exp(
+            -np.matmul(
+                ((inputs - params['input']['hidden']['bias'][:,h]))**2,# @ params['input']['cov']['weights'][h]) ** 2,
+                params['input']['hidden']['weights'][:,h],
+            )
+        ) for h in range(params['input']['hidden']['weights'].shape[1])
+    ]).T
 
     output_activation = hps['output_activation'](
         hidden_activation @ params['hidden']['output']['weights']
@@ -47,12 +46,11 @@ def build_params(num_features, num_hidden_nodes, categories, weight_range = [-.1
     categories <-- (list) list of category labels to use as keys for decode -- output connections
     weight_range = [-.1,.1] <-- (list of numeric)
     '''
-
     return {
         'input': {
             'hidden': {
                 'weights': np.full([num_features, num_hidden_nodes],10.0),
-                'bias': np.random.normal(*weight_range, [num_hidden_nodes, 1, num_features])
+                'bias': np.random.normal(*weight_range, [num_features, num_hidden_nodes]),
             },
             'cov': {'weights': np.array([np.eye(num_features) for h in range(num_hidden_nodes)])},
         },
@@ -89,7 +87,8 @@ def update_params(params, gradients, lr):
 
 
 if __name__ == '__main__':
-
+    import matplotlib.pyplot as plt 
+    from matplotlib.gridspec import GridSpec
     cmap_ = 'binary'
 
     hps = {
@@ -102,6 +101,11 @@ if __name__ == '__main__':
         # 'output_activation': lambda x: np.exp(-(x ** 2)),
     }
 
+    fig = plt.figure(
+        figsize = [8,6]
+    )
+
+    gs = GridSpec(3, 4)
 
     cv = -.004
     inputs = np.concatenate([
@@ -132,6 +136,18 @@ if __name__ == '__main__':
     ])
     labels = [0] *100 + [1] * 50
     cm = {0:'orange',1:'blue'}
+
+    data_ax = plt.subplot(gs[0,0])
+    data_ax.scatter(
+        *inputs.T,
+        c = [cm[l] for l in labels],
+    )
+
+    # data_ax.set_ylim([0,1]); data_ax.set_xlim([0,1])
+    data_ax.set_yticks([]); data_ax.set_xticks([])
+
+
+
 
 
     categories = np.unique(labels)
@@ -171,59 +187,70 @@ if __name__ == '__main__':
         )
     )
 
-
-
-
-
-
-    import matplotlib.pyplot as plt 
-    from mpl_toolkits import mplot3d
-    from matplotlib.gridspec import GridSpec
-
-    clean = lambda ax: [ax.set_yticks([]), ax.set_xticks([])]
-    clean3d = lambda ax: [ax.set_yticks([]), ax.set_xticks([]), ax.set_zticks([])]
-
-
     g = 100
     m1, m2 = [-1,2]
-    xx, yy = np.meshgrid(np.linspace(m1,m2,g), np.linspace(m1,m2,g))
-    mesh = np.array([xx,yy]).reshape(2, g*g).T
-    
-    fig = plt.figure(
-        figsize = [8,4]
+    mesh = np.array(np.meshgrid(np.linspace(m1,m2,g), np.linspace(m1,m2,g))).reshape(2, g*g).T
+
+    pred_ax = plt.subplot(gs[0,1])
+    pred_ax.imshow(
+        np.flip(forward(params, inputs = mesh, hps = hps)[-1][:,0].reshape(g,g), axis = 0),
+        extent = [m1,m2,m1,m2],
+        cmap = 'binary',
     )
-    gs = GridSpec(1,2)
-
-    hidden_activation, output_activation = forward(params, inputs = mesh, hps = hps)
-
-
-    ##__Surface Plot
-    surface_ax = plt.subplot(gs[:,0], projection = '3d')
-    surface_ax.plot_surface(
-        xx, 
-        yy,
-        np.flip(hidden_activation.sum(axis = 1).reshape(g,g), axis = 0),
-        alpha = .5, cmap = 'viridis',
+    pred_ax.scatter(
+        *params['input']['hidden']['bias'],
+        s = np.abs(params['hidden']['output']['weights'][:,0]) * 200,
+        c = ['red' if w < 0 else 'black' for w in params['hidden']['output']['weights'][:,0]]
     )
-    clean3d(surface_ax)
-    surface_ax.set_title('Surface')
-
-
-
-    ##__Flat Plot
-    flat_ax = plt.subplot(gs[:,1])
-    flat_ax.imshow(
-        np.flip(hidden_activation.sum(axis = 1).reshape(g,g), axis = 0),
-        cmap = 'viridis', extent = [m1,m2,m1,m2],
-    )
-    flat_ax.scatter(
+    pred_ax.scatter(
         *inputs.T,
-        c = ['purple' if l == 0 else 'orange' for l in labels]
+        c = [cm[l] for l in labels], alpha = .05
     )
-    clean(flat_ax)
-    flat_ax.set_title('Imshow')
 
+    pred_ax.set_xticks([]);pred_ax.set_yticks([])
 
-    # plt.show()
+    # - - - - 
+
+    pred_ax = plt.subplot(gs[0,2])
+    pred_ax.imshow(
+        np.flip(forward(params, inputs = mesh, hps = hps)[-1][:,1].reshape(g,g), axis = 0),
+        extent = [m1,m2,m1,m2],
+        cmap = 'binary',
+    )
+    pred_ax.scatter(
+        *params['input']['hidden']['bias'],
+        s = np.abs(params['hidden']['output']['weights'][:,1]) * 200,
+        c = ['red' if w < 0 else 'black' for w in params['hidden']['output']['weights'][:,0]]
+    )
+    pred_ax.scatter(
+        *inputs.T,
+        c = [cm[l] for l in labels], alpha = .05
+    )
+    pred_ax.set_xticks([]);pred_ax.set_yticks([])
+
+    # - - - - 
+
+    pred_ax = plt.subplot(gs[0,3])
+    pred_ax.imshow(
+        np.flip(((forward(params, inputs = mesh, hps = hps)[-1][:,1] - forward(params, inputs = mesh, hps = hps)[-1][:,0]).reshape(g,g)), axis = 0), # <-- stand in for model confidence
+        # np.flip((forward(params, inputs = mesh, hps = hps)[-1] / forward(params, inputs = mesh, hps = hps)[-1].max(axis = 1, keepdims = True))[:,0].reshape(g,g), axis = 0),
+        # np.flip(forward(params, inputs = mesh, hps = hps)[-1].argmax(axis = 1).reshape(g,g), axis = 0),
+        # np.flip(forward(params, inputs = mesh, hps = hps)[-1].max(axis = 1).reshape(g,g), axis = 0),
+        # np.flip(np.product(forward(params, inputs = mesh, hps = hps)[-1], axis = 1).reshape(g,g), axis = 0),
+        # np.flip(np.sum(forward(params, inputs = mesh, hps = hps)[-1], axis = 1).reshape(g,g), axis = 0),
+        extent = [m1,m2,m1,m2], cmap = 'PuOr'
+    )
+    pred_ax.set_xticks([]);pred_ax.set_yticks([])
+
+    hacts = forward(params, inputs = mesh, hps = hps)[-2].sum(axis=1,keepdims=True)
+    # hacts = forward(params, inputs = mesh, hps = hps)[-2][:,0:1]
+    hax = plt.subplot(gs[1:3,0:2])
+    hax.imshow(
+        np.flip(hacts.reshape(g,g), axis = 0),
+        extent = [m1,m2,m1,m2],
+        cmap = 'binary',
+    )
+    hax.set_xticks([]); hax.set_yticks([])
+
     plt.savefig('test.png')
-
+    # plt.show()

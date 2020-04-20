@@ -82,10 +82,13 @@ def forward(params, inputs = None, exemplars = None, hps = None):
 
 ## sum squared error loss function
 def loss(params, inputs = None, exemplars = None, targets = None, hps = None):
+    output_activation = forward(params, inputs = inputs, exemplars = exemplars, hps = hps)[-1]
+    targets = (output_activation * targets).clip(1, np.inf) * targets # <-- humble teacher principle (performs max(1,t) func on correct category labels, and min(-1,t) on incorrect channels)
+
     return .5 * np.sum(
         np.square(
             np.subtract(
-                forward(params, inputs = inputs, exemplars = exemplars, hps = hps)[-1],
+                output_activation,
                 targets
             )
         )

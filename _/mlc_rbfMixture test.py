@@ -9,15 +9,16 @@ from autograd import grad
 
 softmax = lambda x: np.exp(x) / np.sum(np.exp(x))
 
+
 def forward(params, inputs = None, hps = None):
-    hidden_activation = np.array([
-        np.exp(
-            -np.matmul(
-                ((inputs - params['input']['hidden']['bias'][:,h]) @ params['input']['cov']['weights'][h]) ** 2,
-                params['input']['hidden']['weights'][:,h],
-            )
-        ) for h in range(params['input']['hidden']['weights'].shape[1])
-    ]).T
+
+    hidden_activation = np.exp(
+        -np.einsum(
+            'hif,fh->ih',
+            ((inputs - params['input']['hidden']['bias']) @ params['input']['cov']['weights'] ) ** 2,
+            params['input']['hidden']['weights']
+        )
+    )
 
     output_activation = hps['output_activation'](
         hidden_activation @ params['hidden']['output']['weights']
@@ -46,18 +47,19 @@ def build_params(num_features, num_hidden_nodes, categories, weight_range = [-.1
     categories <-- (list) list of category labels to use as keys for decode -- output connections
     weight_range = [-.1,.1] <-- (list of numeric)
     '''
+
     return {
         'input': {
             'hidden': {
                 'weights': np.full([num_features, num_hidden_nodes],10.0),
-                'bias': np.random.normal(*weight_range, [num_features, num_hidden_nodes]),
+                'bias': np.random.normal(*weight_range, [num_hidden_nodes, 1, num_features])
             },
             'cov': {'weights': np.array([np.eye(num_features) for h in range(num_hidden_nodes)])},
         },
         'hidden': {
             'output': {
-                'weights': np.random.normal(*weight_range, [num_hidden_nodes, len(categories)]),
-                'bias': np.random.normal(*weight_range, [1, len(categories)]),
+                'weights': np.full([num_hidden_nodes, len(categories)], .5),
+                'bias': np.zeros([1, len(categories)]),
             },
         },
         'attn': .5,
@@ -92,8 +94,8 @@ if __name__ == '__main__':
     cmap_ = 'binary'
 
     hps = {
-        'lr': .5,  # <-- learning rate
-        'wr': [.5, .1],  # <-- weight range
+        'lr': .135,  # <-- learning rate
+        'wr': [.5, .005],  # <-- weight range
         'num_hidden_nodes': 3,
 
         'output_activation': lambda x: softmax(x)
@@ -107,34 +109,51 @@ if __name__ == '__main__':
 
     gs = GridSpec(3, 4)
 
-    cv = -.004
-    inputs = np.concatenate([
-        np.random.multivariate_normal(
-            [.2,.4], 
-            [
-                [.005,cv],
-                [cv,.005],
-            ],
-            [50]
-        ),
-        np.random.multivariate_normal(
-            [.6,-.2], 
-            [
-                [.005,-cv],
-                [-cv,.005],
-            ],
-            [50]
-        ),
-        np.random.multivariate_normal(
-            [.8,.8], 
-            [
-                [.005,cv],
-                [cv,.005],
-            ],
-            [50]
-        )
+    # cv = -.004
+    # inputs = np.concatenate([
+    #     np.random.multivariate_normal(
+    #         [.2,.4], 
+    #         [
+    #             [.005,cv],
+    #             [cv,.005],
+    #         ],
+    #         [50]
+    #     ),
+    #     np.random.multivariate_normal(
+    #         [.6,-.2], 
+    #         [
+    #             [.005,-cv],
+    #             [-cv,.005],
+    #         ],
+    #         [50]
+    #     ),
+    #     np.random.multivariate_normal(
+    #         [.8,.8], 
+    #         [
+    #             [.005,cv],
+    #             [cv,.005],
+    #         ],
+    #         [50]
+    #     )
+    # ])
+    # labels = [0] *100 + [1] * 50
+    inputs = np.array([
+        [0,0],
+        [2,2],
+        [4,4],
+        [6,6],
+
+        [1,3],
+        [3,5],
+        [3,1],
+        [5,3],
     ])
-    labels = [0] *100 + [1] * 50
+    inputs = inputs / 6
+    labels = [0,0,0,0,1,1,1,1]
+
+
+
+
     cm = {0:'orange',1:'blue'}
 
     data_ax = plt.subplot(gs[0,0])
@@ -167,7 +186,7 @@ if __name__ == '__main__':
     #     [.2,.5,.8],
     # ])
 
-    num_epochs = 500
+    num_epochs = 400
 
     print('loss initially: ', loss(params, inputs = inputs, targets = one_hot_targets, hps = hps))
 
@@ -186,6 +205,10 @@ if __name__ == '__main__':
             )
         )
     )
+    print(forward(params, inputs = inputs, hps = hps)[-1])
+    print(forward(params, inputs = inputs, hps = hps)[-1].argmax(axis=1))
+
+    exit()
 
     g = 100
     m1, m2 = [-1,2]
@@ -198,7 +221,7 @@ if __name__ == '__main__':
         cmap = 'binary',
     )
     pred_ax.scatter(
-        *params['input']['hidden']['bias'],
+        *params['input']['hidden']['bias'][:,0,:].T,
         s = np.abs(params['hidden']['output']['weights'][:,0]) * 200,
         c = ['red' if w < 0 else 'black' for w in params['hidden']['output']['weights'][:,0]]
     )
@@ -218,7 +241,7 @@ if __name__ == '__main__':
         cmap = 'binary',
     )
     pred_ax.scatter(
-        *params['input']['hidden']['bias'],
+        *params['input']['hidden']['bias'][:,0,:].T,
         s = np.abs(params['hidden']['output']['weights'][:,1]) * 200,
         c = ['red' if w < 0 else 'black' for w in params['hidden']['output']['weights'][:,0]]
     )
